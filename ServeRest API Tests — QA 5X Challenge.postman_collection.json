@@ -1,0 +1,1443 @@
+{
+  "info": {
+    "_postman_id": "8824eff1-7666-434e-9991-d0dd5487ee1d",
+    "name": "ServeRest API Tests — QA 5X Challenge",
+    "description": "## ServeRest API Test Suite\n\nAutomated API test collection for the [ServeRest](https://serverest.dev) virtual store API.\n\n### Coverage\n\n| Suite | Scenarios |\n| --- | --- |\n| Auth | Login success, invalid credentials, missing fields |\n| Users | CRUD full lifecycle, duplicate email, delete |\n| Products | CRUD full lifecycle, duplicate name |\n| 🛒 Cart | Create, duplicate block, checkout, cancel |\n\n### How to run\n\n1. Import this collection and the `ServeRest_ENV.postman_environment.json` environment.\n    \n2. Select the **ServeRest ENV** environment.\n    \n3. Click **Run collection** (Collection Runner).\n    \n4. All environment variables are set automatically via pre-request and test scripts.\n    \n\n### Base URL\n\n`https://serverest.dev`",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "44478152",
+    "_collection_link": "https://go.postman.co/collection/44478152-8824eff1-7666-434e-9991-d0dd5487ee1d?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "🔐 Suite 01 — Auth (Login)",
+      "item": [
+        {
+          "name": "TC-AUTH-01 | POST /login — Valid credentials",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Generate unique admin user for this run",
+                  "const timestamp = Date.now();",
+                  "const adminEmail = `admin_${Date.now()}@test.com`",
+                  "",
+                  "pm.environment.set('adminEmail', adminEmail);",
+                  "pm.environment.set('adminPassword', 'Test@12345');",
+                  "",
+                  "// Create user via API before login test",
+                  "const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl');",
+                  "pm.sendRequest({",
+                  "  url: `${baseUrl}/usuarios`,",
+                  "  method: 'POST',",
+                  "  header: { 'Content-Type': 'application/json' },",
+                  "  body: {",
+                  "    mode: 'raw',",
+                  "    raw: JSON.stringify({",
+                  "      nome: 'Admin QA5X',",
+                  "      email: adminEmail,",
+                  "      password: 'Test@12345',",
+                  "      administrador: 'true'",
+                  "    })",
+                  "  }",
+                  "}, function(err, res) {",
+                  "  if (!err && res.code === 201) {",
+                  "    pm.environment.set('adminUserId', res.json()._id);",
+                  "    console.log('Pre-request: Admin user created, id =', res.json()._id);",
+                  "  } else {",
+                  "    console.warn('Pre-request: User creation failed —', err || res.text());",
+                  "  }",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 — Login successful', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response time is below 2000ms', function() {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});",
+                  "",
+                  "pm.test('Response contains bearer token', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('authorization');",
+                  "  pm.expect(body.authorization).to.be.a('string');",
+                  "  pm.expect(body.authorization).to.match(/^Bearer\\s.+/);",
+                  "});",
+                  "",
+                  "pm.test('Response message confirms login success', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.message).to.equal('Login realizado com sucesso');",
+                  "});",
+                  "",
+                  "// Save token for downstream requests only if it exists",
+                  "",
+                  "",
+                  "const authorization = pm.response.json().authorization;",
+                  "",
+                  "if (authorization && authorization.startsWith('Bearer ')) {",
+                  "    const token = authorization.split(' ')[1];",
+                  "",
+                  "    pm.environment.set('bearerToken', token);",
+                  "",
+                  "    console.log('JWT token stored:', token.substring(0, 30) + '...');",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "description": "**Happy path:** logs in with valid admin credentials. Stores the `authorization` token in the environment for all authenticated subsequent requests."
+          },
+          "response": []
+        },
+        {
+          "name": "TC-AUTH-02 | POST /login — Invalid password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 — Unauthorized for wrong password', function() {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test('Error message indicates invalid credentials', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.message).to.equal('Email e/ou senha inválidos');",
+                  "});",
+                  "",
+                  "pm.test('No authorization token returned on failed login', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.not.have.property('authorization');",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"wrong_password_999\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "description": "**Negative test:** attempts login with valid email but wrong password. Expects a 401 response with no token issued."
+          },
+          "response": []
+        },
+        {
+          "name": "TC-AUTH-03 | POST /login — Missing email field",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400 — Bad Request when email is missing', function() {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Validation error returned for missing email', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('email');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"Test@12345\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "description": "**Negative test:** sends login request without the `email` field. Expects a 400 validation error."
+          },
+          "response": []
+        }
+      ],
+      "description": "Validates all authentication scenarios: happy path, invalid credentials, and missing required fields."
+    },
+    {
+      "name": "👤 Suite 02 — Users (Usuários)",
+      "item": [
+        {
+          "name": "TC-USER-01 | GET /usuarios — List all users",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 — Users list retrieved', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response contains quantidade field', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('quantidade');",
+                  "  pm.expect(body.quantidade).to.be.a('number');",
+                  "});",
+                  "",
+                  "pm.test('Response contains usuarios array', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('usuarios');",
+                  "  pm.expect(body.usuarios).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('quantidade matches usuarios array length', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.quantidade).to.equal(body.usuarios.length);",
+                  "});",
+                  "",
+                  "pm.test('Each user has required fields', function() {",
+                  "  const { usuarios } = pm.response.json();",
+                  "  if (usuarios.length > 0) {",
+                  "    usuarios.forEach(u => {",
+                  "      pm.expect(u).to.have.all.keys('nome', 'email', 'password', 'administrador', '_id');",
+                  "    });",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios"
+              ]
+            },
+            "description": "Retrieves and validates the full list of registered users, including schema integrity checks."
+          },
+          "response": []
+        },
+        {
+          "name": "TC-USER-02 | POST /usuarios — Create new user",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const ts = Date.now();",
+                  "pm.environment.set('newUserEmail', `user_${ts}@test.com`);",
+                  "pm.environment.set('newUserName', `QA User ${ts}`);",
+                  "",
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 — User created successfully', function() {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response message confirms creation', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.message).to.equal('Cadastro realizado com sucesso');",
+                  "});",
+                  "",
+                  "pm.test('Response contains _id for the new user', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('_id');",
+                  "  pm.expect(body._id).to.be.a('string').and.not.empty;",
+                  "  pm.environment.set('newUserId', body._id);",
+                  "  console.log('New user created with id:', body._id);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"{{newUserName}}\",\n  \"email\": \"{{newUserEmail}}\",\n  \"password\": \"Test@12345\",\n  \"administrador\": \"false\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios"
+              ]
+            },
+            "description": "Creates a non-admin user with a unique timestamp-based email. Saves the `_id` for GET, PUT, and DELETE tests downstream."
+          },
+          "response": []
+        },
+        {
+          "name": "TC-USER-03 | POST /usuarios — Duplicate email rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400 — Duplicate email rejected', function() {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Error message indicates email already in use', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.message).to.equal('Este email já está sendo usado');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Duplicate User\",\n  \"email\": \"{{newUserEmail}}\",\n  \"password\": \"Test@12345\",\n  \"administrador\": \"false\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios"
+              ]
+            },
+            "description": "Attempts to register with the same email created in TC-USER-02. Expects a 400 rejection with a meaningful error message."
+          },
+          "response": []
+        },
+        {
+          "name": "TC-USER-04 | GET /usuarios/{id} — Get user by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 — User found', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Returned user matches created user data', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body._id).to.equal(pm.environment.get('newUserId'));",
+                  "  pm.expect(body.email).to.equal(pm.environment.get('newUserEmail'));",
+                  "  pm.expect(body.administrador).to.equal('false');",
+                  "});",
+                  "",
+                  "pm.test('User schema is valid', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.all.keys('nome', 'email', 'password', 'administrador', '_id');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/{{newUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "{{newUserId}}"
+              ]
+            },
+            "description": "Fetches the user created in TC-USER-02 by its `_id` and validates the returned payload."
+          },
+          "response": []
+        },
+        {
+          "name": "TC-USER-05 | PUT /usuarios/{id} — Update user",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const ts = Date.now();",
+                  "pm.environment.set('updatedUserEmail', `updated_${ts}@test.com`);"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 — User updated successfully', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response message confirms update', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.message).to.equal('Registro alterado com sucesso');",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Updated QA User\",\n  \"email\": \"{{updatedUserEmail}}\",\n  \"password\": \"Updated@99\",\n  \"administrador\": \"false\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/{{newUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "{{newUserId}}"
+              ]
+            },
+            "description": "Updates the user created in TC-USER-02 with new name, email, and password."
+          },
+          "response": []
+        },
+        {
+          "name": "TC-USER-06 | DELETE /usuarios/{id} — Delete user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 — User deleted', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response message confirms deletion', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.message).to.equal('Registro excluído com sucesso');",
+                  "});",
+                  "",
+                  "pm.environment.unset('newUserId');",
+                  "pm.environment.unset('newUserEmail');",
+                  "pm.environment.unset('updatedUserEmail');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/{{newUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "{{newUserId}}"
+              ]
+            },
+            "description": "Deletes the user created in TC-USER-02. Cleans up environment variables after assertion."
+          },
+          "response": []
+        }
+      ],
+      "description": "Full CRUD lifecycle for users, including uniqueness constraint and authorization checks."
+    },
+    {
+      "name": "📦 Suite 03 — Products (Produtos)",
+      "item": [
+        {
+          "name": "TC-PROD-01 | GET /produtos — List all products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 — Products list retrieved', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response contains quantidade and produtos fields', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('quantidade');",
+                  "  pm.expect(body).to.have.property('produtos');",
+                  "  pm.expect(body.produtos).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('quantidade matches produtos array length', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.quantidade).to.equal(body.produtos.length);",
+                  "});",
+                  "",
+                  "pm.test('Each product has required schema fields', function() {",
+                  "  const { produtos } = pm.response.json();",
+                  "  if (produtos.length > 0) {",
+                  "    produtos.forEach(p => {",
+                  "      pm.expect(p).to.have.all.keys('nome', 'preco', 'descricao', 'quantidade', '_id');",
+                  "    });",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/produtos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "produtos"
+              ]
+            },
+            "description": "Retrieves and validates the full product catalog, including schema checks on each item."
+          },
+          "response": []
+        },
+        {
+          "name": "TC-PROD-02 | POST /produtos — Create product (admin)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const ts = Date.now();",
+                  "pm.environment.set('productName', `Produto QA5X ${ts}`);",
+                  "pm.environment.set('productPrice', Math.floor(Math.random() * 500) + 50);"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 — Product created', function() {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response message confirms creation', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.message).to.equal('Cadastro realizado com sucesso');",
+                  "});",
+                  "",
+                  "pm.test('Response contains _id for the new product', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('_id');",
+                  "  pm.expect(body._id).to.be.a('string').and.not.empty;",
+                  "  pm.environment.set('newProductId', body._id);",
+                  "  console.log('New product id:', body._id);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bearerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{bearerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"{{productName}}\",\n  \"preco\": {{productPrice}},\n  \"descricao\": \"Produto criado automaticamente via suite QA5X\",\n  \"quantidade\": 100\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/produtos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "produtos"
+              ]
+            },
+            "description": "Creates a product using admin bearer token obtained from TC-AUTH-01. Saves the product `_id` for downstream tests."
+          },
+          "response": []
+        },
+        {
+          "name": "TC-PROD-03 | POST /produtos — Duplicate product name rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 — Duplicate product name rejected', function() {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Error message indicates name already exists', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.message).to.equal('Já existe produto com esse nome');",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bearerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{bearerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"{{productName}}\",\n  \"preco\": 99,\n  \"descricao\": \"Tentativa de duplicação\",\n  \"quantidade\": 10\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/produtos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "produtos"
+              ]
+            },
+            "description": "Attempts to create a second product using the same name as TC-PROD-02. Expects rejection with a clear error."
+          },
+          "response": []
+        },
+        {
+          "name": "TC-PROD-04 | GET /produtos/{id} — Get product by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 — Product found', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Returned product matches created product', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body._id).to.equal(pm.environment.get('newProductId'));",
+                  "  pm.expect(body.nome).to.equal(pm.environment.get('productName'));",
+                  "  pm.expect(body.quantidade).to.equal(100);",
+                  "});",
+                  "",
+                  "pm.test('Product schema is valid', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.all.keys('nome', 'preco', 'descricao', 'quantidade', '_id');",
+                  "  pm.expect(body.preco).to.be.a('number');",
+                  "  pm.expect(body.quantidade).to.be.a('number');",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bearerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/produtos/{{newProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "produtos",
+                "{{newProductId}}"
+              ]
+            },
+            "description": "Fetches the product created in TC-PROD-02 by `_id` and validates payload and schema."
+          },
+          "response": []
+        },
+        {
+          "name": "TC-PROD-05 | PUT /produtos/{id} — Update product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 — Product updated', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response message confirms update', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.message).to.equal('Registro alterado com sucesso');",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bearerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{bearerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"{{productName}}\",\n  \"preco\": 299,\n  \"descricao\": \"Produto atualizado via suite QA5X\",\n  \"quantidade\": 50\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/produtos/{{newProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "produtos",
+                "{{newProductId}}"
+              ]
+            },
+            "description": "Updates price, description, and quantity of the product created in TC-PROD-02."
+          },
+          "response": []
+        },
+        {
+          "name": "TC-PROD-06 | DELETE /produtos/{id} — Delete product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 — Product deleted', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response message confirms deletion', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.message).to.equal('Registro excluído com sucesso');",
+                  "});",
+                  "",
+                  "pm.environment.unset('newProductId');",
+                  "pm.environment.unset('productName');",
+                  "pm.environment.unset('productPrice');"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bearerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{bearerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/produtos/{{newProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "produtos",
+                "{{newProductId}}"
+              ]
+            },
+            "description": "Deletes the product created in TC-PROD-02. Cleans up environment variables post-assertion."
+          },
+          "response": []
+        }
+      ],
+      "description": "Full CRUD lifecycle for products, admin-only enforcement, and uniqueness constraints."
+    },
+    {
+      "name": "🛒 Suite 04 — Cart (Carrinhos)",
+      "item": [
+        {
+          "name": "TC-CART-00 | SETUP — Create product for cart tests",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const ts = Date.now();",
+                  "pm.environment.set('cartProductName', `Produto Carrinho ${ts}`);"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Setup: Product for cart created (201)', function() {",
+                  "  pm.response.to.have.status(201);",
+                  "  pm.environment.set('cartProductId', pm.response.json()._id);",
+                  "  console.log('Cart product id:', pm.response.json()._id);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bearerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{bearerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"{{cartProductName}}\",\n  \"preco\": 150,\n  \"descricao\": \"Produto para testes de carrinho\",\n  \"quantidade\": 10\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/produtos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "produtos"
+              ]
+            },
+            "description": "Setup step: creates a product to be used in cart scenarios. The `_id` is stored in `cartProductId`."
+          },
+          "response": []
+        },
+        {
+          "name": "TC-CART-01 | GET /carrinhos — List all carts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 — Carts list retrieved', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response contains quantidade and carrinhos fields', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('quantidade');",
+                  "  pm.expect(body).to.have.property('carrinhos');",
+                  "  pm.expect(body.carrinhos).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('quantidade matches carrinhos array length', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.quantidade).to.equal(body.carrinhos.length);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bearerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/carrinhos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "carrinhos"
+              ]
+            },
+            "description": "Retrieves and validates the full list of carts."
+          },
+          "response": []
+        },
+        {
+          "name": "TC-CART-02 | POST /carrinhos — Create cart",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 — Cart created successfully', function() {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response message confirms cart creation', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.message).to.equal('Cadastro realizado com sucesso');",
+                  "});",
+                  "",
+                  "pm.test('Response contains _id for the new cart', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('_id');",
+                  "  pm.expect(body._id).to.be.a('string').and.not.empty;",
+                  "  pm.environment.set('cartId', body._id);",
+                  "  console.log('Cart id:', body._id);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bearerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{bearerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"produtos\": [\n    {\n      \"idProduto\": \"{{cartProductId}}\",\n      \"quantidade\": 2\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/carrinhos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "carrinhos"
+              ]
+            },
+            "description": "Creates a cart for the authenticated admin user with the product set up in TC-CART-00."
+          },
+          "response": []
+        },
+        {
+          "name": "TC-CART-03 | POST /carrinhos — Duplicate cart rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 — Second cart rejected for same user', function() {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Error message indicates user already has a cart', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.message).to.equal('Não é permitido ter mais de 1 carrinho');",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bearerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{bearerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"produtos\": [\n    {\n      \"idProduto\": \"{{cartProductId}}\",\n      \"quantidade\": 1\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/carrinhos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "carrinhos"
+              ]
+            },
+            "description": "Attempts to create a second cart for the same user. Enforces the one-cart-per-user business rule."
+          },
+          "response": []
+        },
+        {
+          "name": "TC-CART-04 | GET /carrinhos/{id} — Get cart by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 — Cart found', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Cart contains correct product', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.produtos).to.be.an('array').with.length.greaterThan(0);",
+                  "  pm.expect(body.produtos[0].idProduto).to.equal(pm.environment.get('cartProductId'));",
+                  "  pm.expect(body.produtos[0].quantidade).to.equal(2);",
+                  "});",
+                  "",
+                  "pm.test('Cart has precoTotal calculated correctly', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('precoTotal');",
+                  "  pm.expect(body.precoTotal).to.equal(300); // 2 x 150",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/carrinhos/{{cartId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "carrinhos",
+                "{{cartId}}"
+              ]
+            },
+            "description": "Fetches the cart by `_id` and validates product content and `precoTotal` calculation."
+          },
+          "response": []
+        },
+        {
+          "name": "TC-CART-05 | DELETE /carrinhos/concluir-compra — Checkout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 — Checkout completed', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response message confirms checkout', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.message).to.equal('Registro excluído com sucesso');",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bearerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{bearerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/carrinhos/concluir-compra",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "carrinhos",
+                "concluir-compra"
+              ]
+            },
+            "description": "Finalizes the purchase (concluir compra), removing the cart and decreasing product stock. Validates the response message."
+          },
+          "response": []
+        },
+        {
+          "name": "TC-CART-06 | SETUP — Recreate cart for cancel test",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Setup: Cart recreated for cancel test (201)', function() {",
+                  "  pm.response.to.have.status(201);",
+                  "  pm.environment.set('cartIdForCancel', pm.response.json()._id);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bearerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{bearerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"produtos\": [\n    {\n      \"idProduto\": \"{{cartProductId}}\",\n      \"quantidade\": 1\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/carrinhos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "carrinhos"
+              ]
+            },
+            "description": "Setup step: recreates the cart after TC-CART-05 checkout so TC-CART-07 has a cart to cancel."
+          },
+          "response": []
+        },
+        {
+          "name": "TC-CART-07 | DELETE /carrinhos/cancelar-compra — Cancel cart",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 — Cart cancelled and stock restored', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response message confirms cancellation', function() {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.message).to.equal('Registro excluído com sucesso. Estoque dos produtos reabastecido');",
+                  "});",
+                  "",
+                  "// Cleanup leftover environment vars",
+                  "pm.environment.unset('cartId');",
+                  "pm.environment.unset('cartIdForCancel');",
+                  "pm.environment.unset('cartProductId');",
+                  "pm.environment.unset('cartProductName');"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bearerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{bearerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/carrinhos/cancelar-compra",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "carrinhos",
+                "cancelar-compra"
+              ]
+            },
+            "description": "Cancels the cart, returning items to stock. Validates that the stock replenishment message is returned."
+          },
+          "response": []
+        }
+      ],
+      "description": "Cart creation, duplicate cart prevention, checkout (concluir compra), and cancellation flows.",
+      "auth": {
+        "type": "bearer"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {},
+            "exec": [
+              ""
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {},
+            "exec": [
+              ""
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://serverest.dev",
+      "type": "string"
+    }
+  ]
+}
