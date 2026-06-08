@@ -1,4 +1,4 @@
-# ServeRest API Test Suite — QA 5X Challenge
+# ServeRest API Test Suite — QA 5X Challenge Lumestack
 
 [![Badge ServeRest](https://img.shields.io/badge/API-ServeRest-green)](https://github.com/ServeRest/ServeRest/)
 [![Postman](https://img.shields.io/badge/Tested%20with-Postman-FF6C37?logo=postman&logoColor=white)](https://www.postman.com/)
@@ -22,9 +22,9 @@ Automated API test collection for the [ServeRest](https://serverest.dev) virtual
 | Suite | Test Cases | Scenarios |
 |---|---|---|
 | 🔐 Auth | TC-AUTH-01 to 03 | Valid login, wrong password, missing field |
-| 👤 Users | TC-USER-01 to 07 | List, CRUD full cycle, duplicate email, 404 after delete |
-| 📦 Products | TC-PROD-01 to 07 | List, CRUD full cycle, duplicate name, non-admin blocked |
-| 🛒 Cart | TC-CART-00 to 08 | List, create, duplicate rejected, checkout, cancel, teardown |
+| 👤 Users | TC-USER-01 to 06 | List, CRUD full cycle, duplicate email |
+| 📦 Products | TC-PROD-01 to 06 | List, CRUD full cycle, duplicate name, non-admin blocked |
+| 🛒 Cart | TC-CART-00 to 07 | List, create, duplicate rejected, checkout, cancel, teardown |
 
 **Total: 22 test cases, 60+ assertions**
 
@@ -101,18 +101,10 @@ TC-AUTH-01 (creates admin + stores token)
        └─> TC-CART-02 (uses cartProductId to create cart)
             └─> TC-CART-05 (checkout)
                  └─> TC-CART-07 (cancel after recreate)
-                      └─> TC-CART-08 (teardown / cleanup)
 ```
 
 ### Dynamic data via timestamps
 All emails and product names include `Date.now()` to guarantee uniqueness per run, avoiding conflicts from shared environment data.
-
-### Design patterns used
-- **Setup / Teardown steps** — dedicated setup requests (TC-CART-00, TC-CART-06) and a teardown (TC-CART-08) isolate state management from business assertions.
-- **Chained requests via `pm.sendRequest`** — complex pre-conditions (e.g., creating a user then logging in as that user) are handled inline without breaking the sequential runner flow.
-- **Environment variables as test context** — IDs and tokens flow through `pm.environment.set/get` rather than hardcoded values.
-
----
 
 ## ✅ Assertion Strategy
 
@@ -159,4 +151,4 @@ Full Swagger documentation: [https://serverest.dev](https://serverest.dev)
 
 ---
 
-*Built for the QA 5X Technical Challenge.*
+*Built for the QA 5X Technical Challenge Lumestack.*
